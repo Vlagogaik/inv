@@ -13,8 +13,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         excel_files = options['excel_files']
-
-        # for file in excel_files:
         self.import_data(excel_files)
 
     def import_data(self, file):
@@ -37,7 +35,7 @@ class Command(BaseCommand):
                 obj, created = TypeOfEquipment.objects.get_or_create(type_name=type_name)
             self.stdout.write("Импорт данных завершён в <Type of equipment>.")
 
-            # эти данные можно извлечь из 2 таблиц но в одной есть перво начальная стоимость в бдругой нет
+            # эти данные можно извлечь из 2 таблиц, но в одной есть первоначальная стоимость в бд другой нет
             if ("ФИО" in headers and "Подразделение" in headers) or ("Инвентарный номер" in headers and ("ОС" in headers or "Основное средство" in headers )and "Дата принятия к учету" in headers):
                 if ("ФИО" in headers and "Подразделение" in headers):
                     fio_col = headers["ФИО"]
@@ -57,13 +55,13 @@ class Command(BaseCommand):
 
                 for row in sheet.iter_rows(min_row=2, values_only=True):
                     #все в одном цикле т.к. мне нужно получить id_workers(это приминимо к 1 таблице а не ко второй(1С)б там я хз как)
-                    if ("ФИО" in headers and "Подразделение" in headers):
+                    if "ФИО" in headers and "Подразделение" in headers:
                         fio_value = row[fio_col - 1]
                         department_value = row[department_col - 1]
                         if fio_value and department_value:
                             worker, created = Workers.objects.get_or_create(
                                 full_name=fio_value,
-                                department = department_value,
+                                department=department_value,
                             )
                             id_worker = worker.id_workers
 
