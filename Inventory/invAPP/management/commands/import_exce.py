@@ -21,7 +21,7 @@ class Command(BaseCommand):
 
             self.stdout.write(f"Обработка данных из файлов {file1} и {file2}")
 
-            types_of_equipment = [
+            types_of_char = [
                 "иное", "ПК", "моноблок", "Ноутбук", "Сервер", "Планшет",
                 "КПК, смартфон", "Моб.телефон", "Факс", "ИБП", "Монитор",
                 "Телевизор", "Видеомагнитофон", "Видеокамера аналог.", "Звуковое оборудование", "Микшерный пульт",
@@ -29,11 +29,30 @@ class Command(BaseCommand):
                 "Принтер", "МФУ", "Копир", "Сканер", "Документ-проектор",
                 "АТС", "Видеорегистратор", "СКУД", "Коммутатор, сетевое"
             ]
-            types_of_equipment = [type_name.lower() for type_name in types_of_equipment]
-            for type_name in types_of_equipment:
-                TypeOfEquipment.objects.get_or_create(type_name=type_name)
+            types = [
+                "отечественный", "общедоступный", "неизвестно"
+            ]
+            type_equipment = [
+                "ПК отечественный".lower(),
+                "Ноутбук отечественный".lower(),
+                "Моноблок отечественный".lower(),
+                "Общедоступный ПК".lower()
+            ]
+            characteristcis = [char_name.lower() for char_name in types_of_char]
+            for char_name in characteristcis:
+                Characteristics.objects.get_or_create(char_name=char_name)
 
-            type_mapping = {
+            for type_name in types:
+                TypeOfEquipment.objects.get_or_create(
+                    type_name=type_name,
+                )
+            type_equipment_map = {
+                "ПК отечественный".lower(): "отечественный",
+                "Ноутбук отечественный".lower(): "отечественный",
+                "Моноблок отечественный".lower(): "отечественный",
+                "Общедоступный ПК".lower(): "общедоступный"
+            }
+            type_mapping_char = {
                 "ПК 2021".lower(): "ПК",
                 "ПК отечественный".lower(): "ПК".lower(),
                 "Ноутбук отечественный".lower(): "Ноутбук".lower(),
@@ -67,19 +86,27 @@ class Command(BaseCommand):
                 if not initial_cost:
                     initial_cost = 0
 
-                type_obj = None
+                type_eq = None
+                type_char = None
                 for col, value in row.items():
                     col = col.strip().lower()
-                    if col in types_of_equipment:
+                    if col in types_of_char:
                         if str(value).strip() == "1":
-                            type_name = type_mapping.get(col, col)
-                            type_obj, _ = TypeOfEquipment.objects.get_or_create(type_name=type_name)
+                            type_name = type_mapping_char.get(col, col)
+                            type_char, _ = Characteristics.objects.get_or_create(char_name=type_name)
                             break
-
+                for col, value in row.items():
+                    col = col.strip().lower()
+                    if col in type_equipment:
+                        if str(value).strip() == "1":
+                            type_name_eq = type_equipment_map.get(col, col)
+                            type_eq, _ = TypeOfEquipment.objects.get_or_create(type_name=type_name_eq)
+                            break
                 # self.stdout.write(f"Обработка данных из файлов {fio} и {department} и {type_obj}")
-                if type_obj is None:
-                    type_obj, _ = TypeOfEquipment.objects.get_or_create(type_name="Иное")
-
+                if type_char is None:
+                    type_char, _ = Characteristics.objects.get_or_create(char_name="иное")
+                if type_eq is None:
+                    type_eq, _ = TypeOfEquipment.objects.get_or_create(type_name="неизвестно")
                 date_acceptance = row.get('Дата принятия к учету')
                 date_decommission = row.get('Дата списания')
                 if not date_decommission:
@@ -87,16 +114,28 @@ class Command(BaseCommand):
                 if not row.get('ОС'):
                     continue
 
-                Inventory1C.objects.get_or_create(
+                inventory_obj, _ = Inventory1C.objects.get_or_create(
                     inventory_decimal=inv_number,
                     defaults={
                         'id_workers': worker,
                         'accounting_name': row.get('ОС'),
                         'date_acceptance_accounting': date_acceptance,
                         'initial_cost': initial_cost,
-                        'id_type': type_obj,
+                        'id_type': type_eq,
                         "real_name": "",
                         "date_of_decommission": date_decommission
+                    }
+
+                )
+                Relation3.objects.get_or_create(
+                    type_of_equipment_id_type=type_eq,
+                    characteristics_id_char=type_char,
+                )
+                Relation4.objects.get_or_create(
+                    inventory_1c_id=inventory_obj,
+                    characteristics_id_char=type_char,
+                    defaults={
+                        "value": ""
                     }
                 )
 
@@ -115,45 +154,47 @@ class Command(BaseCommand):
                 initial_cost = row.get('Стоимость первоначальна')
                 if not initial_cost:
                     initial_cost = 0
+                type_eq = None
+                type_char = None
 
-                type_obj = None
-                for type_name in types_of_equipment:
+                for type_name in types_of_char:
                     if type_name in row and str(row[type_name]).strip():
-                        type_obj, _ = TypeOfEquipment.objects.get_or_create(type_name=type_name)
+                        type_char, _ = Characteristics.objects.get_or_create(char_name=type_name)
+                        self.stdout.write(f"Идем по первому файлу {type_char}")
                         break
-
-                if type_obj is None:
-                    type_obj, _ = TypeOfEquipment.objects.get_or_create(type_name="Иное")
+                for type_name_eq in types:
+                    if type_name_eq in row and str(row[type_name_eq]).strip():
+                        type_eq, _ = TypeOfEquipment.objects.get_or_create(type_name=type_name_eq)
+                        self.stdout.write(f"Идем по первому файлу {type_eq}")
+                        break
+                if type_char is None:
+                    type_char, _ = Characteristics.objects.get_or_create(char_name="иное")
+                if type_eq is None:
+                    type_eq, _ = TypeOfEquipment.objects.get_or_create(type_name="неизвестно")
 
                 date_acceptance = row.get('Дата принятия к учету')
-
                 if not row.get('Основное средство'):
                     continue
-                # self.stdout.write(f"Обработка данных из файлов {fio} и {department} и {type_obj}")
-                Inventory1C.objects.get_or_create(
+                inventory_obj, _ = Inventory1C.objects.get_or_create(
                     inventory_decimal=inv_number,
                     id_workers=worker,
                     accounting_name=row.get('Основное средство'),
                     date_acceptance_accounting=date_acceptance,
                     initial_cost=initial_cost,
-                    id_type=type_obj,
+                    id_type=type_eq,
                     defaults={
                         "real_name": "",
                         "date_of_decommission": ""
                     }
                 )
-                Characteristics.objects.get_or_create(
-                    defaults={
-                        "char_name": ""
-                    }
-                )
+
                 Relation3.objects.get_or_create(
-                    type_of_equipment_id_type=type_obj,
-                    characteristics_id_char=Characteristics.objects.get,
+                    type_of_equipment_id_type=type_eq,
+                    characteristics_id_char=type_char,
                 )
                 Relation4.objects.get_or_create(
-                    inventory_1c_id=Inventory1C.objects.get,
-                    characteristics_id_char=Characteristics.objects.get,
+                    inventory_1c_id=inventory_obj,
+                    characteristics_id_char=type_char,
                     defaults={
                         "value": ""
                     }
