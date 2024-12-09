@@ -63,6 +63,7 @@ class Command(BaseCommand):
                 )
 
                 initial_cost = row.get('Стоимость первоначальна')
+
                 if not initial_cost:
                     initial_cost = 0
 
@@ -103,14 +104,9 @@ class Command(BaseCommand):
             for row in data1:
                 inv_number = row.get('Инвентарный номер')
                 if not inv_number:
-                    continue
-
-                fio = inventory_map.get(inv_number, {}).get('ФИО')
-                department = inventory_map.get(inv_number, {}).get('Подразделение')
-
-                if not fio or not department:
-                    fio = "Неизвестно"
-                    department = "Неизвестно"
+                    inv_number = "Неизвестно"
+                fio = "Неизвестно"
+                department = "Неизвестно"
 
                 worker, _ = Workers.objects.get_or_create(
                     full_name=fio,
@@ -136,15 +132,32 @@ class Command(BaseCommand):
                 # self.stdout.write(f"Обработка данных из файлов {fio} и {department} и {type_obj}")
                 Inventory1C.objects.get_or_create(
                     inventory_decimal=inv_number,
+                    id_workers=worker,
+                    accounting_name=row.get('Основное средство'),
+                    date_acceptance_accounting=date_acceptance,
+                    initial_cost=initial_cost,
+                    id_type=type_obj,
                     defaults={
-                        'id_workers': worker,
-                        'accounting_name': row.get('Основное средство'),
-                        'date_acceptance_accounting': date_acceptance,
-                        'initial_cost': initial_cost,
-                        'id_type': type_obj,
                         "real_name": "",
                         "date_of_decommission": ""
                     }
+                )
+                Characteristics.objects.get_or_create(
+                    defaults={
+                        "char_name": ""
+                    }
+                )
+                Relation3.objects.get_or_create(
+                    type_of_equipment_id_type=type_obj,
+                    characteristics_id_char=Characteristics.objects.get,
+                )
+                Relation4.objects.get_or_create(
+                    inventory_1c_id=Inventory1C.objects.get,
+                    characteristics_id_char=Characteristics.objects.get,
+                    defaults={
+                        "value": ""
+                    }
+
                 )
 
             self.stdout.write(self.style.SUCCESS("Импорт данных завершён."))
